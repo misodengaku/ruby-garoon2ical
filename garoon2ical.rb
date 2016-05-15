@@ -19,17 +19,14 @@ form.field_with(:name => "_account").value = conf["username"]
 form.field_with(:name => "_password").value = conf["password"]
 result = form.submit
 
-p result.forms
-
 #ここまでで、ログインできてる
 # Todo: なおす
-form =result.forms[1]
+form = result.forms[1]
 
 #現在日付から 90日とってみよう
 today = Date.today
 endday = today + conf["date_range"]
 
-p form
 form.field_with(:name => "start_year").value = today.year
 form.field_with(:name => "start_month").value = today.month
 form.field_with(:name => "start_day").value = "1"
@@ -68,19 +65,7 @@ csv.each do |sc|
     e.dtend       = Icalendar::Values::DateTime.new(DateTime.parse(sc[2]+" "+sc[3]), {'TZID' => 'Asia/Tokyo'})
   end
 end
-# STANDARD コンポーネントを生成
-standard_component = Icalendar::Component.new('STANDARD')
-standard_component.append_custom_property('dtstart', '19700101T000000')
-standard_component.append_custom_property('tzoffsetfrom', '+0900')
-standard_component.append_custom_property('tzoffsetto', '+0900')
-standard_component.append_custom_property('tzname', 'JST')
 
-# VTIMEZONE コンポーネントを生成
-vtimezone_component = Icalendar::Component.new('VTIMEZONE')
-vtimezone_component.append_custom_property('tzid', 'Asia/Tokyo')
-#vtimezone_component.add(standard_component)
-standard_component.parent = vtimezone_component
-#cal.add(standard_component)
 cal.publish
 
 # iCalファイル生成
