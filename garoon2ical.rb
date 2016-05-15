@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+#coding: utf-8
+
 require 'rubygems'
 require 'mechanize'
 require 'csv'
@@ -6,25 +8,28 @@ require 'icalendar'
 require 'kconv'
 require 'yaml'
 
-$KCODE = 'u'
 
 #設定の読み込み
 conf = YAML.load_file("config.yaml")
 
-agent = WWW::Mechanize.new
+agent = Mechanize.new
 page = agent.get conf["cybozu_url"]
 form = page.forms.first
 form.field_with(:name => "_account").value = conf["username"]
 form.field_with(:name => "_password").value = conf["password"]
 result = form.submit
 
+p result.forms
+
 #ここまでで、ログインできてる
-form =result.forms.first
+# Todo: なおす
+form =result.forms[1]
 
 #現在日付から 90日とってみよう
 today = Date.today
 endday = today + conf["date_range"]
 
+p form
 form.field_with(:name => "start_year").value = today.year
 form.field_with(:name => "start_month").value = today.month
 form.field_with(:name => "start_day").value = "1"
@@ -42,26 +47,41 @@ result2 = form.submit
 csv = CSV.parse(result2.body.toutf8)
 # iCalオブジェクトの生成
 cal = Icalendar::Calendar.new
+
+cal.timezone do |t|
+  t.tzid = 'Asia/Tokyo'
+  t.standard do |s|
+    s.tzoffsetfrom = '+0900'
+    s.tzoffsetto   = '+0900'
+    s.tzname       = 'JST'
+    s.dtstart      = '19700101T000000'
+  end
+end
+
+cal.append_custom_property('X-WR-CALNAME;VALUE=TEXT', "#{conf['calname']}")
+
 csv.each do |sc|
-  cal.event do
-    dtstart       DateTime.parse(sc[0]+" "+sc[1]), {'TZID' => 'Asia/Tokyo'}
-    dtend         DateTime.parse(sc[2]+" "+sc[3]), {'TZID' => 'Asia/Tokyo'}
-    summary     sc[5]+"("+sc[4]+")"
-    description     sc[6].sub(/\n/,"")
+  cal.event do |e|
+    e.summary     = sc[5]+"("+sc[4]+")"
+    e.description = sc[6].sub(/\n/,"")
+    e.dtstart     = Icalendar::Values::DateTime.new(DateTime.parse(sc[0]+" "+sc[1]), {'TZID' => 'Asia/Tokyo'})
+    e.dtend       = Icalendar::Values::DateTime.new(DateTime.parse(sc[2]+" "+sc[3]), {'TZID' => 'Asia/Tokyo'})
   end
 end
 # STANDARD コンポーネントを生成
 standard_component = Icalendar::Component.new('STANDARD')
-standard_component.custom_property('dtstart', '19700101T000000')
-standard_component.custom_property('tzoffsetfrom', '+0900')
-standard_component.custom_property('tzoffsetto', '+0900')
-standard_component.custom_property('tzname', 'JST')
+standard_component.append_custom_property('dtstart', '19700101T000000')
+standard_component.append_custom_property('tzoffsetfrom', '+0900')
+standard_component.append_custom_property('tzoffsetto', '+0900')
+standard_component.append_custom_property('tzname', 'JST')
 
 # VTIMEZONE コンポーネントを生成
 vtimezone_component = Icalendar::Component.new('VTIMEZONE')
-vtimezone_component.custom_property('tzid', 'Asia/Tokyo')
-vtimezone_component.add(standard_component)
-cal.add(vtimezone_component)
+vtimezone_component.append_custom_property('tzid', 'Asia/Tokyo')
+#vtimezone_component.add(standard_component)
+standard_component.parent = vtimezone_component
+#cal.add(standard_component)
+cal.publish
 
 # iCalファイル生成
 File.open(conf["calname"]+".ics", "w+b") { |f|
