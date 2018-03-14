@@ -21,12 +21,14 @@ result = form.submit
 
 #ここまでで、ログインできてる
 # Todo: なおす
-form = result.forms[1]
+form = result.forms[2]
+
 
 #現在日付から 90日とってみよう
 today = Date.today
 endday = today + conf["date_range"]
-
+p form
+p form.field_with(:name => "start_year")
 form.field_with(:name => "start_year").value = today.year
 form.field_with(:name => "start_month").value = today.month
 form.field_with(:name => "start_day").value = "1"
